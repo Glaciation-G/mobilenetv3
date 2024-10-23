@@ -203,6 +203,7 @@ def main(args):
     utils.init_distributed_mode(args)
     print(args)
     device = torch.device(args.device)
+    print(f"Device being used: {args.device}")
 
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
