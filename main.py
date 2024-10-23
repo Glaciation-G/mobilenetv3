@@ -474,7 +474,9 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('ConvNeXt training and evaluation script', parents=[get_args_parser()])
-    args = parser.parse_args()
+    args = parser.parse_args()  # 从命令行解析传入的数据
     if args.output_dir:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    main(args)
+        # parents：允许递归创建父目录
+        # exist_ok：目录如果已经存在的话不会报错
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)    
+    main(args)  # 运行主程序

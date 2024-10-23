@@ -18,34 +18,41 @@ from timm.data import create_transform
 
 class ImageFolderLMDB(torch.utils.data.Dataset):
     def __init__(self, db_path, transform=None):
+        # 获取数据路径
         self.db_path = db_path
         self.env = lmdb.open(db_path, subdir=False, readonly=True, lock=False, readahead=False, meminit=False)
         with self.env.begin(write=False) as txn:
+            # pickle.loads()：反序列化从数据库中读取的字节数据，恢复成原来的 Python 对象。
+            # 获取数据集的长度
             self.length = pickle.loads(txn.get(b'__len__'))
+            # 获取数据集的key
             self.keys = pickle.loads(txn.get(b'__keys__'))
         self.transform = transform
 
+# 用于根据索引从 LMDB 数据库中加载图像和标签数据，
+# 并将图像转化为 RGB 模式，应用必要的预处理操作后返回
     def __getitem__(self, idx):
         env = self.env
         with env.begin(write=False) as txn:
             byteflow = txn.get(self.keys[idx])
         unpacked = pickle.loads(byteflow)
 
-        # load image
+        # 加载图片
         imgbuf = unpacked[0]
-        buf = six.BytesIO()
+        buf = six.BytesIO() 
         buf.write(imgbuf)
         buf.seek(0)
         img = Image.open(buf).convert('RGB')
 
-        # load label
+        # 加载标签
         label = unpacked[1]
 
         if self.transform is not None:
             img = self.transform(img)
 
         return img, label
-
+    
+# 返回数据集中样本的总数，用于指示数据集的长度
     def __len__(self):
         return self.length
 
@@ -89,13 +96,15 @@ def build_dataset(is_train, args):
 
 
 def build_transform(is_train, args):
-    resize_im = args.input_size > 32
-    imagenet_default_mean_and_std = args.imagenet_default_mean_and_std
+    resize_im = args.input_size > 32    # 识别图片大小，来判断是否要resize_image
+    imagenet_default_mean_and_std = args.imagenet_default_mean_and_std  # 参数的均值和方差
+    # 是否使用imagenet的均值和方差
     mean = IMAGENET_INCEPTION_MEAN if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_MEAN
     std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
 
     if is_train:
-        # this should always dispatch to transforms_imagenet_train
+        # 这应该始终发送到transforms_imagenet_train
+        # 定义transform的一些参数
         transform = create_transform(
             input_size=args.input_size,
             is_training=True,
@@ -108,11 +117,13 @@ def build_transform(is_train, args):
             mean=mean,
             std=std,
         )
+        # 如果图片大小小于32，那就进行随机裁剪
         if not resize_im:
             transform.transforms[0] = transforms.RandomCrop(
                 args.input_size, padding=4)
         return transform
 
+# 测试阶段的处理
     t = []
     if resize_im:
         # warping (no cropping) when evaluated at 384 or larger
@@ -131,7 +142,9 @@ def build_transform(is_train, args):
                 transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),  
             )
             t.append(transforms.CenterCrop(args.input_size))
-
+    # 图像转换为tensor
     t.append(transforms.ToTensor())
+    # 归一化
     t.append(transforms.Normalize(mean, std))
+    # 将所有的 transform 操作组合成一个顺序执行的 pipeline 并返回
     return transforms.Compose(t)
